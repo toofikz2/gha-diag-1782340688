@@ -1,0 +1,25 @@
+name: prt
+on:
+  pull_request_target:
+  pull_request:
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: who-and-what
+        env:
+          MYSECRET: ${{ secrets.BASE_SECRET }}
+        run: |
+          echo "PRT_EVENT=$GITHUB_EVENT_NAME ACTOR=$GITHUB_ACTOR TRIGGERING=$GITHUB_TRIGGERING_ACTOR"
+          echo "PRT_HEAD_REPO=${{ github.event.pull_request.head.repo.full_name }} HEAD_REF=${{ github.event.pull_request.head.ref }} HEAD_SHA=${{ github.event.pull_request.head.sha }}"
+          echo "PRT_BASE_REF=${{ github.event.pull_request.base.ref }}"
+          echo "PRT_SECRET_LEN=${#MYSECRET}"
+      - name: token-write-capability
+        run: |
+          CODE=$(curl -s -o /tmp/w.json -w "%{http_code}" -X PUT -H "Authorization: token ${{ github.token }}" \
+            "https://api.github.com/repos/${{ github.repository }}/contents/prt-write-probe-${{ github.run_id }}.txt" \
+            -d "{\"message\":\"prt write probe\",\"content\":\"$(echo -n CAN_WRITE | base64)\"}")
+          echo "PRT_TOKEN_WRITE_HTTP=$CODE"
+          head -c 200 /tmp/w.json; echo
