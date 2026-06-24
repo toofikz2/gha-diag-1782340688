@@ -1,0 +1,28 @@
+name: B
+on:
+  workflow_run:
+    workflows: ["A"]
+    types: [completed, requested]
+permissions:
+  contents: read
+jobs:
+  consume:
+    runs-on: ubuntu-latest
+    steps:
+      - name: state
+        run: |
+          echo "B_WR_EVENT=${{ github.event.workflow_run.event }}"
+          echo "B_HEAD_REPO=${{ github.event.workflow_run.head_repository.full_name }}"
+          echo "B_HEAD_REPO_ID=${{ github.event.workflow_run.head_repository.id }}"
+          echo "B_HEAD_SHA=${{ github.event.workflow_run.head_sha }}"
+          echo "B_HEAD_BRANCH=${{ github.event.workflow_run.head_branch }}"
+      - name: checkout-wr-head
+        id: co
+        continue-on-error: true
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: prove
+        run: |
+          echo "B_CHECKOUT_OUTCOME=${{ steps.co.outcome }}"
+          echo "B_FILE_CONTENT=[$(cat pwn.txt 2>/dev/null || echo MISSING)]"
