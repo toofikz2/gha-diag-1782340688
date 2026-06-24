@@ -1,0 +1,9 @@
+name: A
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  slow:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "A started for PR head ${{ github.event.pull_request.head.repo.full_name }}"; sleep 130; echo "A done"
