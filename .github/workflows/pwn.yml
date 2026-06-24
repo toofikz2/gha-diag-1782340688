@@ -1,0 +1,27 @@
+name: pwn
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
+permissions:
+  contents: read
+jobs:
+  checkout-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: state
+        run: |
+          echo "PWN_EVENT_TYPE=${{ github.event.action }}"
+          echo "PWN_HEAD_REPO=${{ github.event.pull_request.head.repo.full_name }}"
+          echo "PWN_HEAD_REPO_ID=${{ github.event.pull_request.head.repo.id }}"
+          echo "PWN_HEAD_SHA=${{ github.event.pull_request.head.sha }}"
+      - name: checkout-head-sha
+        id: co
+        continue-on-error: true
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: prove
+        run: |
+          echo "PWN_CHECKOUT_OUTCOME=${{ steps.co.outcome }}"
+          echo "PWN_FILE_CONTENT=[$(cat pwn.txt 2>/dev/null || echo MISSING)]"
+          echo "PWN_HEAD_COMMIT_MSG=[$(git log -1 --format=%s 2>/dev/null || echo NO_GIT)]"
