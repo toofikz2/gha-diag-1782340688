@@ -11,14 +11,25 @@ jobs:
     steps:
       - name: context
         run: |
-          echo CTX_ACTOR=$GITHUB_ACTOR REPO=$GITHUB_REPOSITORY REF=$GITHUB_REF EVENT=$GITHUB_EVENT_NAME
-          echo CTX_WORKFLOW_REF=$GITHUB_WORKFLOW_REF RUN_ID=$GITHUB_RUN_ID
-          echo CTX_TRIGGERING_ACTOR=$GITHUB_TRIGGERING_ACTOR
-      - name: oidc-claims
+          echo "CTX_ACTOR=$GITHUB_ACTOR REPO=$GITHUB_REPOSITORY REF=$GITHUB_REF EVENT=$GITHUB_EVENT_NAME"
+          echo "CTX_WORKFLOW_REF=$GITHUB_WORKFLOW_REF"
+          echo "CTX_TRIGGERING_ACTOR=$GITHUB_TRIGGERING_ACTOR"
+      - name: oidc
+        env:
+          AUD: poc-audience
         run: |
-          R=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=poc-audience")
-          TOK=$(echo "$R" | python3 -c "import sys,json;print(json.load(sys.stdin)["value"])")
-          P=$(echo "$TOK" | cut -d. -f2)
-          echo OIDC_CLAIMS_START
-          python3 -c "import base64,json;p='$P';p+='='*(-len(p)%4);print(json.dumps(json.loads(base64.urlsafe_b64decode(p)),indent=2))"
-          echo OIDC_CLAIMS_END
+          set -e
+          curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AUD" -o /tmp/oidc.json || echo "OIDC_REQUEST_FAILED"
+          python3 - <<'PY'
+          import json,base64
+          try:
+              v=json.load(open('/tmp/oidc.json'))['value']
+              p=v.split('.')[1]; p+='='*(-len(p)%4)
+              claims=json.loads(base64.urlsafe_b64decode(p))
+              print("OIDC_CLAIMS_START")
+              print(json.dumps(claims,indent=2,sort_keys=True))
+              print("OIDC_CLAIMS_END")
+          except Exception as e:
+              print("OIDC_DECODE_ERR",repr(e))
+              print(open('/tmp/oidc.json').read()[:300])
+          PY
