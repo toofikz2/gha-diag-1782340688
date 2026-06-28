@@ -1,0 +1,51 @@
+name: oidc-fork-test
+on:
+  pull_request:
+    types: [opened, synchronize]
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  oidc-claims:
+    runs-on: ubuntu-latest
+    steps:
+      - name: extract-oidc
+        run: |
+          echo "EVENT=$GITHUB_EVENT_NAME"
+          echo "ACTOR=$GITHUB_ACTOR"
+          echo "TRIGGERING=$GITHUB_TRIGGERING_ACTOR"
+          echo "HEAD_REF=$GITHUB_HEAD_REF"
+          echo "BASE_REF=$GITHUB_BASE_REF"
+          echo "REPO=$GITHUB_REPOSITORY"
+          echo "REPO_OWNER=$GITHUB_REPOSITORY_OWNER"
+          
+          if [ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "OIDC_NOT_AVAILABLE=true"
+            exit 0
+          fi
+          
+          curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=fork-test" -o /tmp/oidc.json
+          
+          python3 - <<PYEOF
+          import json, base64
+          try:
+              v = json.load(open("/tmp/oidc.json"))["value"]
+              p = v.split(".")[1]
+              p += "=" * (-len(p) % 4)
+              claims = json.loads(base64.urlsafe_b64decode(p))
+              print("OIDC_CLAIMS_START")
+              for k in sorted(claims):
+                  print(f"  {k}: {claims[k]}")
+              print("OIDC_CLAIMS_END")
+              print(f"OIDC_REPO={claims.get(repository)}")
+              print(f"OIDC_OWNER={claims.get(repository_owner)}")
+              print(f"OIDC_REF={claims.get(ref)}")
+              print(f"OIDC_HEAD_REF={claims.get(head_ref)}")
+              print(f"OIDC_BASE_REF={claims.get(base_ref)}")
+              print(f"OIDC_SUB={claims.get(sub)}")
+              print(f"OIDC_ACTOR={claims.get(actor)}")
+          except Exception as e:
+              print(f"OIDC_ERROR={e}")
+              print(open("/tmp/oidc.json").read()[:500])
+          PYEOF
